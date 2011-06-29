@@ -1,0 +1,12 @@
+{application, m2mw,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { m2mw_app, []}},
+  {env, []}
+ ]}.
