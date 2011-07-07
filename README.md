@@ -20,6 +20,7 @@ Now you'll need to start Mongrel2. An example `mongrel2.conf` file that will
 work with this example is included in this project. To start Mongrel2 using this
 file, `cd` to the root of this project and issue the following commands:
 
+    mkdir run
     m2sh load
     m2sh start -name main
 
@@ -40,7 +41,8 @@ The Mochiweb proxy socket runs on port 9716. Sorry, that's not configurable
 at the moment.
 
 You should now be able to make requests to your Mongrel2 instance and have them
-serviced by Mochiweb over ZeroMQ.
+serviced by Mochiweb over ZeroMQ. Try navigating to http://localhost:6767/ to
+test.
 
 ## Using m2mw with Webmachine ##
 
