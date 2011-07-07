@@ -26,16 +26,13 @@ stop() ->
 %% ===================================================================
 
 init([]) ->
-    ChildSpecs = [child(m2mw_handler, "tcp://127.0.0.1:1337", "tcp://127.0.0.1:1338", 6506),
-                  child(m2mw_socket, 6506)],
+    ChildSpecs = [child(m2mw_handler, 6666),
+                  child(m2mw_socket, 6666)],
     {ok, {{one_for_all, 5, 10}, ChildSpecs}}.
 
-child(m2mw_handler, SubEndpt, PushEndpt, Port) ->
-    Args = [SubEndpt, PushEndpt, Port],
-    {m2mw_handler, {m2mw_handler, start_link, Args},
-        permanent, 5000, worker, [m2mw_handler]}.
-
+child(m2mw_handler, Port) ->
+    {m2mw_handler, {m2mw_handler, start_link, [Port]},
+        permanent, 5000, worker, [m2mw_handler]};
 child(m2mw_socket, Port) ->
     {m2mw_socket, {m2mw_socket, start_link, [Port]},
         permanent, 5000, worker, [m2mw_socket]}.
-    

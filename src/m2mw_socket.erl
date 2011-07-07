@@ -3,7 +3,7 @@
 -behaviour(gen_fsm).
 
 %% API
--export([listen/1,
+-export([exchange/2,
          start/1,
          start_link/1]).
 
@@ -21,20 +21,23 @@
          reply/2]).
 
 %% State data
--record(state, {listen=null, mwsock=null, port=null, send=null}).
+-record(state, {listen=null, mw_sock=null, port=null, zmq_msg=null, zmq_send=null}).
+
+-define(TIMEOUT_HEADERS, 300000).
+-define(TIMEOUT_RESPONSE, 30000).
 
 %% ===================================================================
 %% API functions
 %% ===================================================================
 
 start(Port) ->
-    gen_fsm:start(?MODULE, [Port], []).
+    gen_fsm:start({local, ?MODULE}, ?MODULE, [Port], []).
 
 start_link(Port) ->
-    gen_fsm:start_link(?MODULE, [Port], []).
+    gen_fsm:start_link({local, ?MODULE}, ?MODULE, [Port], []).
 
-listen(ZmqSend) ->
-    gen_fsm:sync_send_event(?MODULE, {accept, ZmqSend}).
+exchange(ZmqMsg, ZmqSend) ->
+    gen_fsm:sync_send_event(?MODULE, {accept, ZmqMsg, ZmqSend}).
 
 %% ===================================================================
 %% Behaviour callbacks
@@ -65,31 +68,111 @@ terminate(_Reason, _State, StateData) ->
 %% State callbacks
 %% ===================================================================
 
-idle({accept, ZmqSend}, _From, StateData) ->
-    {reply, ok, accept, StateData#state{send=ZmqSend}, 0}.
+idle({accept, ZmqMsg, ZmqSend}, _From, StateData) ->
+    {reply, ok, accept, StateData#state{zmq_msg=ZmqMsg, zmq_send=ZmqSend}, 0}.
 
 accept(timeout, StateData) ->
-    {ok, Socket} = gen_tcp:accept(StateData#state.listen),
-    {next_state, reply, StateData#state{mwsock=Socket}, 0}.
+    {ok, MwSock} = gen_tcp:accept(StateData#state.listen),
+    {next_state, reply, StateData#state{mw_sock=MwSock}, 0}.
 
 reply(timeout, StateData) ->
-    #state{mwsock=MwSock, send=Send} = StateData,
-    receive
-        {tcp, MwSock, Bin} ->
-            erlzmq:send(Send, Bin),
-            {next_state, reply, StateData, 0};
-        {tcp_closed, MwSock} ->
-            ok = m2mw_handler:recv(),
-            ok = gen_tcp:close(MwSock),
-            StateData1 = StateData#state{mwsock=null, send=null},
-            {next_state, idle, StateData1} 
-    end.
+    #state{mw_sock=MwSock, zmq_msg=ZmqMsg, zmq_send=ZmqSend} = StateData,
+    HttpReq = construct_http_req(ZmqMsg),
+    ok = gen_tcp:send(MwSock, HttpReq),
+    MochiResp = collect_resp(MwSock),
+    ZmqResp = construct_zmq_resp(ZmqMsg, MochiResp),
+    erlzmq:send(ZmqSend, ZmqResp),
+    {next_state, idle, reset(StateData)}. 
 
 %% ===================================================================
 %% Support functions
 %% ===================================================================
+
+collect_resp(MwSock) ->
+    unicode:characters_to_binary(lists:reverse(collect_resp(MwSock, []))).
+
+collect_resp(MwSock, Lines) ->
+    case gen_tcp:recv(MwSock, 0, ?TIMEOUT_RESPONSE) of
+        {ok, {http_response, {VsnMaj, VsnMin}, Code, Msg}} ->
+            inet:setopts(MwSock, [{packet, httph}]),
+            ResponseLine = io_lib:format("HTTP ~b/~b ~b ~s\r\n",
+                                         [VsnMaj, VsnMin, Code, Msg]),
+            collect_resp_headers(MwSock, [ResponseLine|Lines]);
+        {ok, {http_error, "\r\n"}} ->
+            collect_resp_headers(MwSock, Lines);
+        {ok, {http_error, "\n"}} ->
+            collect_resp_headers(MwSock, Lines);
+        {error, closed} ->
+            ok = gen_tcp:close(MwSock),
+            Lines;
+        {error, timeout} ->
+            error_logger:error_msg("Timed out waiting on response from Mochiweb"),
+            ok = gen_tcp:close(MwSock),
+            Lines;
+        Other ->
+            % really should handle an invalid request here
+            error_logger:error_msg("Unexpected value recv'd for response line:~n~p~n", [Other]),
+            ok = gen_tcp:close(MwSock),
+            Lines
+    end.
+
+collect_resp_headers(MwSock, Lines) ->
+    case gen_tcp:recv(MwSock, 0, ?TIMEOUT_HEADERS) of
+        {ok, http_eoh} ->
+            % body is next
+            inet:setopts(MwSock, [{packet, raw}]),
+            collect_resp_body(MwSock, Lines);
+        {ok, {http_header, _, Name, _, Value}} ->
+            HeaderLine = io_lib:format("~s: ~s\r\n", [Name, Value]),
+            collect_resp_headers(MwSock, [HeaderLine|Lines]);
+        {error, closed} ->
+            ok = gen_tcp:close(MwSock),
+            Lines;
+        {error, timeout} ->
+            error_logger:error_msg("Timed out waiting on headers from Mochiweb"),
+            ok = gen_tcp:close(MwSock),
+            Lines;
+        Other ->
+            % really should handle an invalid request here
+            error_logger:error_msg("Unexpected value recv'd for header:~n~p~n", [Other]),
+            ok = gen_tcp:close(MwSock),
+            Lines
+    end.
+
+collect_resp_body(MwSock, Lines) ->
+    Lines1 = case gen_tcp:recv(MwSock, 0, ?TIMEOUT_RESPONSE) of
+        {ok, Rest} ->
+            [Rest, "\r\n"|Lines];
+        {error, closed} ->
+            Lines; 
+        {error, timeout} ->
+            Lines;
+        Other ->
+            % really should handle an invalid request here
+            error_logger:error_msg("Unexpected value recv'd for body:~n~p~n", [Other]),
+            Lines
+    end,
+    ok = gen_tcp:close(MwSock),
+    Lines1.
+
+construct_http_req({_Uuid, _Id, Path, _HeadersSize, Headers, _BodySize, Body}) ->
+    {struct, HeadersPl} = mochijson2:decode(Headers),
+    Method = proplists:get_value(<<"METHOD">>, HeadersPl),
+    Vsn = proplists:get_value(<<"VERSION">>, HeadersPl),
+    RequestLine = io_lib:format("~s ~s ~s\r\n", [Method, Path, Vsn]),
+    HeaderLines = [io_lib:format("~s: ~s\r\n", [K,V]) || {K,V} <- HeadersPl], 
+    unicode:characters_to_binary(RequestLine ++ HeaderLines ++ "\r\n" ++ Body).
+
+construct_zmq_resp({Uuid, Id, _, _, _, _, _}, MochiResp) ->
+    IoList = io_lib:format("~s ~w:~s, ~s", [Uuid, length(Id), Id, MochiResp]),
+    unicode:characters_to_binary(IoList).
  
 init_socket(Port) ->
-    SockOpts = [binary, {packet, 4}, {reuseaddr, true}, {active, true} ],
+    SockOpts = [binary, {active, false}, {backlog, 30}, {packet, http}, {reuseaddr, true} ],
     {ok, Listen} = gen_tcp:listen(Port, SockOpts),
     Listen.
+
+reset(StateData) ->
+    ok = m2mw_handler:recv(),
+    % ok = gen_tcp:close(StateData#state.mw_sock),
+    StateData#state{mw_sock=null, zmq_msg=null, zmq_send=null}.
