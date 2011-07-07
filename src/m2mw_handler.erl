@@ -110,8 +110,6 @@ idle({configure, SubEndpt, PushEndpt, BodyFun}, _From, StateData) ->
 %% ===================================================================
 
 init_zmq(SubEndpt, PushEndpt) ->
-    SubEndpt =  "tcp://127.0.0.1:9998",
-    PushEndpt =  "tcp://127.0.0.1:9999",
     {ok, Context} = erlzmq:context(),
     {ok, Recv} = erlzmq:socket(Context, pull),
     ok = erlzmq:connect(Recv, PushEndpt),
