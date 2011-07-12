@@ -26,8 +26,9 @@ stop() ->
 %% ===================================================================
 
 init([]) ->
-    ChildSpecs = [child(m2mw_handler, 6666),
-                  child(m2mw_socket, 6666)],
+    {ok, Port} = application:get_env(port),
+    ChildSpecs = [child(m2mw_handler, Port),
+                  child(m2mw_socket, Port)],
     {ok, {{one_for_all, 5, 10}, ChildSpecs}}.
 
 child(m2mw_handler, Port) ->

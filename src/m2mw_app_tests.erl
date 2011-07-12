@@ -6,9 +6,10 @@
 
 setup() ->
     m2mw:start(),
-    mochiweb_http:start([{ip, "127.0.0.1"}, {port, 8080}, {loop, {mochiweb_http, default_body}}]),
+    BodyFun = fun() -> "Hello" end,
+    mochiweb_http:start([{ip, "127.0.0.1"}, {port, 8080}, {loop, BodyFun}]),
     application:start(m2mw),
-    m2mw_handler:configure("tcp://127.0.0.1:9998", "tcp://127.0.0.1:9999", 6666).
+    m2mw_handler:configure("tcp://127.0.0.1:9998", "tcp://127.0.0.1:9999", BodyFun).
 
 cleanup(_Pid) ->
     application:stop(m2mw).

@@ -8,5 +8,5 @@
                   stdlib
                  ]},
   {mod, { m2mw_app, []}},
-  {env, []}
+  {env, [{port, 9200}]}
  ]}.

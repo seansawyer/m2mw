@@ -4,6 +4,6 @@
               {registered,[]},
               {applications,[kernel,stdlib]},
               {mod,{m2mw_app,[]}},
-              {env,[]},
+              {env,[{port,9200}]},
               {modules,[m2mw,m2mw_app,m2mw_app_tests,m2mw_handler,m2mw_socket,
                         m2mw_sup]}]}.
