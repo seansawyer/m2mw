@@ -69,10 +69,13 @@ terminate(_Reason, _State, StateData) ->
 %% ===================================================================
 
 idle({accept, ZmqMsg, ZmqSend}, _From, StateData) ->
+    error_logger:info_msg("Readying for exchange.~n"),
     {reply, ok, accept, StateData#state{zmq_msg=ZmqMsg, zmq_send=ZmqSend}, 0}.
 
 accept(timeout, StateData) ->
+    error_logger:info_msg("Waiting for proxy socket connection...~n"),
     {ok, MwSock} = gen_tcp:accept(StateData#state.listen),
+    error_logger:info_msg("Proxy socket connected: ~p~n", [MwSock]),
     {next_state, reply, StateData#state{mw_sock=MwSock}, 0}.
 
 reply(timeout, StateData) ->
