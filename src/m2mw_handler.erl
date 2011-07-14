@@ -88,7 +88,6 @@ prox(timeout, StateData) ->
     error_logger:info_msg("Calling handler loop~n"),
     try mochiweb_http:loop(MwSock, StateData#state.body_fun)
     catch
-        error_logger:info_msg("Hander finished~n"),
         exit:normal -> {next_state, idle, StateData, 10000}
     end;
 prox(_, StateData) ->
