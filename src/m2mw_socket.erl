@@ -128,7 +128,7 @@ collect_resp_headers(MwSock, Lines) ->
         {ok, http_eoh} ->
             % body is next
             inet:setopts(MwSock, [{packet, raw}]),
-            collect_resp_body(MwSock, ["Connection: close\r\n"|Lines);
+            collect_resp_body(MwSock, ["Connection: close\r\n"|Lines]);
         {ok, {http_header, _, Name, _, Value}} ->
             HeaderLine = io_lib:format("~s: ~s\r\n", [Name, Value]),
             collect_resp_headers(MwSock, [HeaderLine|Lines]);
