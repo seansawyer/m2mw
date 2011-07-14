@@ -69,6 +69,7 @@ terminate(_Reason, _State, _StateData) ->
 
 recv(timeout, StateData) ->
     StateData1 = StateData#state{msg=null},
+    error_logger:info_msg("Waiting for ZeroMQ messages..."),
     {ok, Msg} = erlzmq:recv(StateData1#state.recv),
     error_logger:info_msg("Incoming ZeroMQ message:~n~p~n", [Msg]),
     {next_state, prox, StateData1#state{msg=deconstruct(Msg)}, 0}.
@@ -105,6 +106,7 @@ idle(timeout, StateData) ->
 idle({configure, SubEndpt, PushEndpt, BodyFun}, _From, StateData) ->
     {Recv, Send} = init_zmq(SubEndpt, PushEndpt),
     StateData1 = StateData#state{body_fun=BodyFun, msg=null, recv=Recv, send=Send},
+    error_logger:info_msg("m2mw configured - sub endpoint ~p, push endpoint ~p~n", [SubEndpt, PushEndpt]),
     {reply, ok, recv, StateData1, 0}.
 
 %% ===================================================================
