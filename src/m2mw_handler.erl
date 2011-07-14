@@ -70,6 +70,7 @@ terminate(_Reason, _State, _StateData) ->
 recv(timeout, StateData) ->
     StateData1 = StateData#state{msg=null},
     {ok, Msg} = erlzmq:recv(StateData1#state.recv),
+    error_logger:info_msg("Incoming ZeroMQ message:~n~p~n", [Msg]),
     {next_state, prox, StateData1#state{msg=deconstruct(Msg)}, 0}.
 
 recv({configure, _, _, _}, _, StateData) ->
@@ -77,6 +78,7 @@ recv({configure, _, _, _}, _, StateData) ->
 
 prox(timeout, StateData) ->
     #state{msg=Msg, port=Port, send=Send} = StateData,
+    error_logger:info_msg("Proxying to Mochiweb on ~p~n", [Port]),
     ok = m2mw_socket:exchange(Msg, Send),
     {ok, MwSock} = gen_tcp:connect("localhost", Port, [binary,
                                                        {active, false},
