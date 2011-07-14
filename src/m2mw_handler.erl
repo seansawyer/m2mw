@@ -127,8 +127,9 @@ init_zmq(SubEndpt, PushEndpt) ->
 %%     <<"UUID CLIENT_ID PATH HDRS_SIZE:HDRS,BODY_SIZE:BODY,">>
 %% Here we deconstruct them into a tuple:
 %%     `{Uuid, Id, Path, HeadersSize, Headers, BodySize, Body}'
+% <<"HSALSelohcnysHSALS-elohcnys-redrawrof 60 / 718:{\"PATH\":\"\\/\",\"x-forwarded-for\":\"10.194.213.220\",\"cache-control\":\"max-age=0\",\"accept-language\":\"en-US,en;q=0.8\",\"connection\":\"close\",\"accept-encoding\":\"gzip,deflate, sdch\",\"accept-charset\":\"ISO-8859-1,utf-8;q=0.7,*;q=0.3\",\"accept\":\"text\\/html,application\\/xhtml+xml,application\\/xml;q=0.9,*\\/*;q=0.8\",\"user-agent\":\"Mozilla\\/5.0 (Macintosh; Intel Mac OS X 10_6_7) AppleWebKit\\/534.30 (KH TML, like Gecko) Chrome\\/12.0.742.112 Safari\\/534.30\",\"host\":\"api.cloud.vitrue.com\",\"cookie\":\"__utma=115479937.1544716122.1299637033.1309269870.1310316619.7; __utmz=115479937.1310317280.7.3.utmccn=(organic)|utmcsr=google|utmctr= vitrue+publisher|utmcmd=organic\",\"METHOD\":\"GET\",\"VERSION\":\"HTTP\\/1.1\",\"URI\":\"\\/\",\"PATTERN\":\"\\/synchole\\/\"},0:,">>
 deconstruct(ZmqMsg) ->
-    MsgRe = "^([-0-9a-z]+) (\\d+) (.+) (\\d+):(.*),(\\d+):(.*),$",
+    MsgRe = "^([-0-9A-Za-z]+) (\\d+) (.+) (\\d+):(.*),(\\d+):(.*),$",
     MsgStr = unicode:characters_to_list(ZmqMsg),
     {match, Captured} = re:run(ZmqMsg, MsgRe),
     [_|Parts] = [ string:substr(MsgStr, Start+1, Length) || {Start, Length} <- Captured ],
