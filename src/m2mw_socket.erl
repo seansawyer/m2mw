@@ -167,8 +167,8 @@ construct_http_req({_Uuid, _Id, Path, _HeadersSize, Headers, _BodySize, Body}) -
     Method = proplists:get_value(<<"METHOD">>, HeadersPl),
     Vsn = proplists:get_value(<<"VERSION">>, HeadersPl),
     RequestLine = io_lib:format("~s ~s ~s\r\n", [Method, Path, Vsn]),
-    HeaderLines = [io_lib:format("~s: ~s\r\n", [K,V]) || {K,V} <- HeadersPl], 
-    unicode:characters_to_binary(RequestLine ++ HeaderLines ++ "\r\n" ++ Body).
+    HeaderLines = [io_lib:format("~s: ~s\r\n", [K,V]) || {K,V} <- HeadersPl],
+    unicode:characters_to_binary(RequestLine ++ HeaderLines ++ "Connection: close\r\n" ++ "\r\n" ++ Body).
 
 construct_zmq_resp({Uuid, Id, _, _, _, _, _}, MochiResp) ->
     IoList = io_lib:format("~s ~w:~s, ~s", [Uuid, length(Id), Id, MochiResp]),
