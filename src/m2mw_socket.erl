@@ -128,7 +128,7 @@ collect_resp_headers(MwSock, Lines) ->
         {ok, http_eoh} ->
             % body is next
             inet:setopts(MwSock, [{packet, raw}]),
-            collect_resp_body(MwSock, Lines);
+            collect_resp_body(MwSock, ["Connection: close\r\n"|Lines);
         {ok, {http_header, _, Name, _, Value}} ->
             HeaderLine = io_lib:format("~s: ~s\r\n", [Name, Value]),
             collect_resp_headers(MwSock, [HeaderLine|Lines]);
@@ -151,13 +151,13 @@ collect_resp_body(MwSock, Lines) ->
         {ok, Rest} ->
             [Rest, "\r\n"|Lines];
         {error, closed} ->
-            Lines; 
+            ["\r\n"|Lines]; 
         {error, timeout} ->
-            Lines;
+            ["\r\n"|Lines];
         Other ->
             % really should handle an invalid request here
             error_logger:error_msg("Unexpected value recv'd for body:~n~p~n", [Other]),
-            Lines
+            ["\r\n"|Lines]
     end,
     ok = gen_tcp:close(MwSock),
     Lines1.
@@ -168,7 +168,7 @@ construct_http_req({_Uuid, _Id, Path, _HeadersSize, Headers, _BodySize, Body}) -
     Vsn = proplists:get_value(<<"VERSION">>, HeadersPl),
     RequestLine = io_lib:format("~s ~s ~s\r\n", [Method, Path, Vsn]),
     HeaderLines = [io_lib:format("~s: ~s\r\n", [K,V]) || {K,V} <- HeadersPl],
-    unicode:characters_to_binary(RequestLine ++ HeaderLines ++ "Connection: close\r\n" ++ "\r\n" ++ Body).
+    unicode:characters_to_binary(RequestLine ++ HeaderLines ++ "\r\n" ++ Body).
 
 construct_zmq_resp({Uuid, Id, _, _, _, _, _}, MochiResp) ->
     IoList = io_lib:format("~s ~w:~s, ~s", [Uuid, length(Id), Id, MochiResp]),
