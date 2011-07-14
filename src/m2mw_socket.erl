@@ -102,7 +102,7 @@ collect_resp(MwSock, Lines) ->
     case gen_tcp:recv(MwSock, 0, ?TIMEOUT_RESPONSE) of
         {ok, {http_response, {VsnMaj, VsnMin}, Code, Msg}} ->
             inet:setopts(MwSock, [{packet, httph}]),
-            ResponseLine = io_lib:format("HTTP ~b/~b ~b ~s\r\n",
+            ResponseLine = io_lib:format("HTTP/~b.~b ~b ~s\r\n",
                                          [VsnMaj, VsnMin, Code, Msg]),
             collect_resp_headers(MwSock, [ResponseLine|Lines]);
         {ok, {http_error, "\r\n"}} ->
