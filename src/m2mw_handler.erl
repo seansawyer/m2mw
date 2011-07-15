@@ -36,6 +36,9 @@ start_link(Port) ->
     gen_fsm:start_link({local, ?MODULE}, ?MODULE, [Port], []).
 
 configure(SubEndpt, PushEndpt, BodyFun) ->
+    application:set_env(m2mw, sub, SubEndpt),
+    application:set_env(m2mw, push, PushEndpt),
+    application:set_env(m2mw, body_fun, BodyFun),
     gen_fsm:sync_send_event(?MODULE, {configure, SubEndpt, PushEndpt, BodyFun}).
 
 recv() ->
@@ -46,7 +49,10 @@ recv() ->
 %% ===================================================================
 
 init([Port]) ->
-    {ok, idle, #state{port=Port}}.
+    init(Port,
+         application:get_env(m2mw, sub),
+         application:get_env(m2mw, push),
+         application:get_env(m2mw, body_fun)).
 
 code_change(_OldVsn, State, StateData, _Extra) ->
     {ok, State, StateData}.
@@ -107,12 +113,23 @@ idle(timeout, StateData) ->
 idle({configure, SubEndpt, PushEndpt, BodyFun}, _From, StateData) ->
     {Recv, Send} = init_zmq(SubEndpt, PushEndpt),
     StateData1 = StateData#state{body_fun=BodyFun, msg=null, recv=Recv, send=Send},
-    error_logger:info_msg("m2mw configured - sub endpoint ~p, push endpoint ~p~n", [SubEndpt, PushEndpt]),
     {reply, ok, recv, StateData1, 0}.
 
 %% ===================================================================
 %% Support functions
 %% ===================================================================
+
+init(Port, {ok, SubEndpt}, {ok, PushEndpt}, {ok, BodyFun}) when is_list(SubEndpt),
+                                                                is_list(PushEndpt),
+                                                                BodyFun =/= undefined ->
+    {Recv, Send} = init_zmq(SubEndpt, PushEndpt),
+    StateData = #state{body_fun=BodyFun, port=Port, recv=Recv, send=Send},
+    error_logger:info_msg("Configured from environment - port: ~p, sub: ~p, push: ~p, fun: ~p~n",
+                          [Port, SubEndpt, PushEndpt, BodyFun]),
+    {ok, recv, StateData, 0};
+init(Port, _, _, _) ->
+    error_logger:info_msg("Failed to configure from environment; use m2mw_handler:configure/3~n"),
+    {ok, idle, #state{port=Port}}.
 
 init_zmq(SubEndpt, PushEndpt) ->
     {ok, Context} = erlzmq:context(),
@@ -120,6 +137,7 @@ init_zmq(SubEndpt, PushEndpt) ->
     ok = erlzmq:connect(Recv, PushEndpt),
     {ok, Send} = erlzmq:socket(Context, pub),
     ok = erlzmq:connect(Send, SubEndpt),
+    error_logger:info_msg("m2mw configured: sub ~p, push ~p~n", [SubEndpt, PushEndpt]),
     {Recv, Send}.
 
 -spec deconstruct (binary()) -> tuple(Uuid::string(), Id::string(), Path::string(),
