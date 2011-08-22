@@ -152,7 +152,7 @@ collect_resp_body(MwSock, Lines, ContentLength) ->
     collect_resp_body(MwSock, ["\r\n"|Lines], ContentLength, 0).
 
 collect_resp_body(MwSock, Lines, undefined, _) ->
-    error_logger:error_msg("No content length was specified; sending empty response."),
+    error_logger:info_msg("No content length was specified; sending empty response."),
     ok = gen_tcp:close(MwSock),
     Lines;
 collect_resp_body(MwSock, Lines, ContentLength, Read) when Read >= ContentLength ->
