@@ -75,7 +75,6 @@ terminate(_Reason, _State, _StateData) ->
 
 recv(timeout, StateData) ->
     StateData1 = StateData#state{msg=null},
-    error_logger:info_msg("Waiting for ZeroMQ messages..."),
     {ok, Msg} = erlzmq:recv(StateData1#state.recv),
     error_logger:info_msg("Incoming ZeroMQ message:~n~p~n", [Msg]),
     {next_state, prox, StateData1#state{msg=deconstruct(Msg)}, 0}.
@@ -85,13 +84,11 @@ recv({configure, _, _, _}, _, StateData) ->
 
 prox(timeout, StateData) ->
     #state{msg=Msg, port=Port, send=Send} = StateData,
-    error_logger:info_msg("Connecting Mochiweb proxy socket on ~p...~n", [Port]),
     ok = m2mw_socket:exchange(Msg, Send),
     {ok, MwSock} = gen_tcp:connect("localhost", Port, [binary,
                                                        {active, false},
                                                        {packet, http}]),
     put(mochiweb_request_force_close, true),
-    error_logger:info_msg("Calling handler loop~n"),
     try mochiweb_http:loop(MwSock, StateData#state.body_fun)
     catch
         exit:normal -> {next_state, idle, StateData, 10000}
