@@ -78,10 +78,8 @@ accept(timeout, StateData) ->
 reply(timeout, StateData) ->
     #state{mw_sock=MwSock, zmq_msg=ZmqMsg, zmq_send=ZmqSend} = StateData,
     HttpReq = construct_http_req(ZmqMsg),
-    error_logger:info_msg("Reformed HTTP request:~n~p~n", [HttpReq]),
     ok = gen_tcp:send(MwSock, HttpReq),
     MochiResp = collect_resp(MwSock),
-    error_logger:info_msg("Collected Mochiweb response:~n~p~n", [MochiResp]),
     ZmqResp = construct_zmq_resp(ZmqMsg, MochiResp),
     error_logger:info_msg("Constructed ZeroMQ response:~n~p~n", [ZmqResp]),
     erlzmq:send(ZmqSend, ZmqResp),
