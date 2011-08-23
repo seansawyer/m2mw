@@ -1,9 +1,9 @@
 {application,m2mw,
              [{description,[]},
               {vsn,"1"},
-              {registered,[]},
+              {registered,[m2mw_sup]},
               {applications,[kernel,stdlib]},
               {mod,{m2mw_app,[]}},
-              {env,[{port,9200}]},
+              {env,[{port_lo,9200},{port_hi,9215}]},
               {modules,[m2mw,m2mw_app,m2mw_app_tests,m2mw_handler,m2mw_socket,
                         m2mw_sup]}]}.

@@ -33,7 +33,7 @@ you passed to Mochiweb to handle requests (a fun, {M,F} or {M,F,A}), and then
 tell it to start receiving:
 
     application:start(m2mw),
-    m2mw_handler:configure("tcp://127.0.0.1:9998", "tcp://127.0.0.1:9999", {mochiweb_http, default_body}).
+    m2mw_sup:configure_handlers("tcp://127.0.0.1:9998", "tcp://127.0.0.1:9999", {mochiweb_http, default_body}).
 
 Obviously your endpoints and function will be different, but you get the idea.
 

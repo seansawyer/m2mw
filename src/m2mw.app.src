@@ -2,11 +2,8 @@
  [
   {description, ""},
   {vsn, "1"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib
-                 ]},
-  {mod, { m2mw_app, []}},
-  {env, [{port, 9200}]}
+  {registered, [m2mw_sup]},
+  {applications, [kernel, stdlib]},
+  {mod, {m2mw_app, []}},
+  {env, [{port_lo, 9200}, {port_hi, 9215}]}
  ]}.

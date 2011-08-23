@@ -3,7 +3,7 @@
 -behaviour(gen_fsm).
 
 %% API
--export([exchange/2,
+-export([exchange/3,
          start/1,
          start_link/1]).
 
@@ -31,13 +31,13 @@
 %% ===================================================================
 
 start(Port) ->
-    gen_fsm:start({local, ?MODULE}, ?MODULE, [Port], []).
+    gen_fsm:start(?MODULE, [Port], []).
 
 start_link(Port) ->
-    gen_fsm:start_link({local, ?MODULE}, ?MODULE, [Port], []).
+    gen_fsm:start_link(?MODULE, [Port], []).
 
-exchange(ZmqMsg, ZmqSend) ->
-    gen_fsm:sync_send_event(?MODULE, {accept, ZmqMsg, ZmqSend}).
+exchange(Pid, ZmqMsg, ZmqSend) ->
+    gen_fsm:sync_send_event(Pid, {accept, ZmqMsg, ZmqSend}).
 
 %% ===================================================================
 %% Behaviour callbacks
@@ -193,6 +193,7 @@ init_socket(Port) ->
     Listen.
 
 reset(StateData) ->
-    ok = m2mw_handler:recv(),
+    HandlerPid = m2mw_sup:handler(StateData#state.port),
+    ok = m2mw_handler:recv(HandlerPid),
     % ok = gen_tcp:close(StateData#state.mw_sock),
     StateData#state{mw_sock=null, zmq_msg=null, zmq_send=null}.

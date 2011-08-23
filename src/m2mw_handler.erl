@@ -3,8 +3,8 @@
 -behaviour(gen_fsm).
 
 %% API
--export([configure/3,
-         recv/0,
+-export([configure/4,
+         recv/1,
          start/1,
          start_link/1]).
 
@@ -30,19 +30,19 @@
 %% ===================================================================
 
 start(Port) ->
-    gen_fsm:start({local, ?MODULE}, ?MODULE, [Port], []).
+    gen_fsm:start(?MODULE, [Port], []).
 
 start_link(Port) ->
-    gen_fsm:start_link({local, ?MODULE}, ?MODULE, [Port], []).
+    gen_fsm:start_link(?MODULE, [Port], []).
 
-configure(SubEndpt, PushEndpt, BodyFun) ->
-    application:set_env(m2mw, sub, SubEndpt),
-    application:set_env(m2mw, push, PushEndpt),
+configure(Pid, Sub, Push, BodyFun) ->
+    application:set_env(m2mw, sub, Sub),
+    application:set_env(m2mw, push, Push),
     application:set_env(m2mw, body_fun, BodyFun),
-    gen_fsm:sync_send_event(?MODULE, {configure, SubEndpt, PushEndpt, BodyFun}).
+    gen_fsm:sync_send_event(Pid, {configure, Sub, Push, BodyFun}).
 
-recv() ->
-    gen_fsm:send_event(?MODULE, recv).
+recv(Pid) ->
+    gen_fsm:send_event(Pid, recv).
 
 %% ===================================================================
 %% Behaviour callbacks
@@ -84,7 +84,8 @@ recv({configure, _, _, _}, _, StateData) ->
 
 prox(timeout, StateData) ->
     #state{msg=Msg, port=Port, send=Send} = StateData,
-    ok = m2mw_socket:exchange(Msg, Send),
+    SocketPid = m2mw_sup:socket(Port),
+    ok = m2mw_socket:exchange(SocketPid, Msg, Send),
     {ok, MwSock} = gen_tcp:connect("localhost", Port, [binary,
                                                        {active, false},
                                                        {packet, http}]),
@@ -121,8 +122,6 @@ init(Port, {ok, SubEndpt}, {ok, PushEndpt}, {ok, BodyFun}) when is_list(SubEndpt
                                                                 BodyFun =/= undefined ->
     {Recv, Send} = init_zmq(SubEndpt, PushEndpt),
     StateData = #state{body_fun=BodyFun, port=Port, recv=Recv, send=Send},
-    error_logger:info_msg("Configured from environment - port: ~p, sub: ~p, push: ~p, fun: ~p~n",
-                          [Port, SubEndpt, PushEndpt, BodyFun]),
     {ok, recv, StateData, 0};
 init(Port, _, _, _) ->
     error_logger:info_msg("Failed to configure from environment; use m2mw_handler:configure/3~n"),
@@ -134,7 +133,6 @@ init_zmq(SubEndpt, PushEndpt) ->
     ok = erlzmq:connect(Recv, PushEndpt),
     {ok, Send} = erlzmq:socket(Context, pub),
     ok = erlzmq:connect(Send, SubEndpt),
-    error_logger:info_msg("m2mw configured: sub ~p, push ~p~n", [SubEndpt, PushEndpt]),
     {Recv, Send}.
 
 -spec deconstruct (binary()) -> tuple(Uuid::string(), Id::string(), Path::string(),
