@@ -35,7 +35,7 @@ tell it to start receiving:
     application:start(m2mw),
     m2mw_sup:configure_handlers("tcp://127.0.0.1:9998", "tcp://127.0.0.1:9999", {mochiweb_http, default_body}).
 
-Obviously your endpoints and function will be different, but you get the idea.
+Obviously your endpoints and function will be different, but you get the idea. If you just want a quick demo, start Mongrel2 take a look at `m2mw_util:test_mochiweb/0` or `m2mw_util:test_mochiweb/1`, which run essentially the code listed above.
 
 The Mochiweb proxy socket runs on port 9716. Sorry, that's not configurable
 at the moment.

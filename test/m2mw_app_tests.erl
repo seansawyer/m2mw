@@ -1,7 +1,5 @@
 -module(m2mw_app_tests).
 
--compile(export_all).
-
 -include_lib("eunit/include/eunit.hrl").
 
 setup() ->

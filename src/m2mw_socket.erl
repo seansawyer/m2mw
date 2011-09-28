@@ -2,6 +2,8 @@
 
 -behaviour(gen_fsm).
 
+-include_lib("m2mw.hrl").
+
 %% API
 -export([exchange/3,
          start/1,
@@ -21,7 +23,7 @@
          reply/2]).
 
 %% State data
--record(state, {listen=null, mw_sock=null, port=null, zmq_msg=null, zmq_send=null}).
+-record(state, {listen=null, mw_sock=null, port=null, req=null, zmq_send=null}).
 
 -define(TIMEOUT_HEADERS, 300000).
 -define(TIMEOUT_RESPONSE, 30000).
@@ -36,8 +38,8 @@ start(Port) ->
 start_link(Port) ->
     gen_fsm:start_link(?MODULE, [Port], []).
 
-exchange(Pid, ZmqMsg, ZmqSend) ->
-    gen_fsm:sync_send_event(Pid, {accept, ZmqMsg, ZmqSend}).
+exchange(Pid, Req, ZmqSend) ->
+    gen_fsm:sync_send_event(Pid, {accept, Req, ZmqSend}).
 
 %% ===================================================================
 %% Behaviour callbacks
@@ -68,19 +70,19 @@ terminate(_Reason, _State, StateData) ->
 %% State callbacks
 %% ===================================================================
 
-idle({accept, ZmqMsg, ZmqSend}, _From, StateData) ->
-    {reply, ok, accept, StateData#state{zmq_msg=ZmqMsg, zmq_send=ZmqSend}, 0}.
+idle({accept, Req, ZmqSend}, _From, StateData) ->
+    {reply, ok, accept, StateData#state{req=Req, zmq_send=ZmqSend}, 0}.
 
 accept(timeout, StateData) ->
     {ok, MwSock} = gen_tcp:accept(StateData#state.listen),
     {next_state, reply, StateData#state{mw_sock=MwSock}, 0}.
 
 reply(timeout, StateData) ->
-    #state{mw_sock=MwSock, zmq_msg=ZmqMsg, zmq_send=ZmqSend} = StateData,
-    HttpReq = construct_http_req(ZmqMsg),
+    #state{mw_sock=MwSock, req=Req, zmq_send=ZmqSend} = StateData,
+    HttpReq = construct_http_req(Req),
     ok = gen_tcp:send(MwSock, HttpReq),
     MochiResp = collect_resp(MwSock),
-    ZmqResp = construct_zmq_resp(ZmqMsg, MochiResp),
+    ZmqResp = m2mw_util:compose_response(Req, MochiResp),
     error_logger:info_msg("Constructed ZeroMQ response:~n~p~n", [ZmqResp]),
     erlzmq:send(ZmqSend, ZmqResp),
     {next_state, idle, reset(StateData)}. 
@@ -173,17 +175,13 @@ collect_resp_body(MwSock, Lines, ContentLength, NRead) ->
     ok = gen_tcp:close(MwSock),
     Lines1.
 
-construct_http_req({_Uuid, _Id, Path, _HeadersSize, Headers, _BodySize, Body}) ->
+construct_http_req(#req{path=Path, headers=Headers, body=Body}) ->
     {struct, HeadersPl} = mochijson2:decode(Headers),
     Method = proplists:get_value(<<"METHOD">>, HeadersPl),
     Vsn = proplists:get_value(<<"VERSION">>, HeadersPl),
     RequestLine = io_lib:format("~s ~s ~s\r\n", [Method, Path, Vsn]),
     HeaderLines = [io_lib:format("~s: ~s\r\n", [K,V]) || {K,V} <- HeadersPl],
-    unicode:characters_to_binary(RequestLine ++ HeaderLines ++ "\r\n" ++ Body).
-
-construct_zmq_resp({Uuid, Id, _, _, _, _, _}, MochiResp) ->
-    IoList = io_lib:format("~s ~w:~s, ~s", [Uuid, length(Id), Id, MochiResp]),
-    unicode:characters_to_binary(IoList).
+    iolist_to_binary([RequestLine, HeaderLines, "\r\n", Body]).
  
 init_socket(Port) ->
     SockOpts = [binary, {active, false}, {backlog, 30}, {packet, http}, {reuseaddr, true} ],
@@ -194,4 +192,4 @@ reset(StateData) ->
     HandlerPid = m2mw_sup:handler(StateData#state.port),
     ok = m2mw_handler:recv(HandlerPid),
     % ok = gen_tcp:close(StateData#state.mw_sock),
-    StateData#state{mw_sock=null, zmq_msg=null, zmq_send=null}.
+    StateData#state{mw_sock=null, req=null, zmq_send=null}.

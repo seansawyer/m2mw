@@ -2,6 +2,8 @@
 
 -behaviour(gen_fsm).
 
+-include_lib("m2mw.hrl").
+
 %% API
 -export([configure/4,
          recv/1,
@@ -23,7 +25,7 @@
          
 
 %% State data
--record(state, {body_fun=null, msg=null, port=null, recv=null, send=null}).
+-record(state, {body_fun=null, req=null, port=null, recv=null, send=null}).
 
 %% ===================================================================
 %% API functions
@@ -74,20 +76,20 @@ terminate(_Reason, _State, _StateData) ->
 %% ===================================================================
 
 recv(timeout, StateData) ->
-    StateData1 = StateData#state{msg=null},
+    StateData1 = StateData#state{req=null},
     error_logger:info_msg("Polling Mongrel2 on 0MQ socket: ~p",
                           [StateData1#state.recv]),
     {ok, Msg} = erlzmq:recv(StateData1#state.recv),
     error_logger:info_msg("Incoming ZeroMQ message:~n~p", [Msg]),
-    {next_state, prox, StateData1#state{msg=deconstruct(Msg)}, 0}.
+    {next_state, prox, StateData1#state{req=m2mw_util:parse_request(Msg)}, 0}.
 
 recv({configure, _, _, _}, _, StateData) ->
     {reply, already_configured, recv, StateData}.
 
 prox(timeout, StateData) ->
-    #state{msg=Msg, port=Port, send=Send} = StateData,
+    #state{req=Req, port=Port, send=Send} = StateData,
     SocketPid = m2mw_sup:socket(Port),
-    ok = m2mw_socket:exchange(SocketPid, Msg, Send),
+    ok = m2mw_socket:exchange(SocketPid, Req, Send),
     {ok, MwSock} = gen_tcp:connect("localhost", Port, [binary,
                                                        {active, false},
                                                        {packet, http}]),
@@ -104,17 +106,17 @@ prox({configure, _, _, _}, _, StateData) ->
     
 idle(recv, StateData) when StateData#state.recv =:= null ->
     error_logger:warn_msg("Unable to receive; 0MQ sockets not configured!"),
-    {next_state, idle, StateData#state{msg=null}};
+    {next_state, idle, StateData#state{req=null}};
 idle(recv, StateData) ->
-    {next_state, recv, StateData#state{msg=null}, 0};
+    {next_state, recv, StateData#state{req=null}, 0};
 idle(timeout, StateData) ->
-    {next_state, recv, StateData#state{msg=null}, 0}.
+    {next_state, recv, StateData#state{req=null}, 0}.
 
 idle({configure, SubEndpt, PushEndpt, BodyFun}, _From, StateData) ->
     {Recv, Send} = init_zmq(SubEndpt, PushEndpt),
     error_logger:info_msg("Handler sockets configured (sub ~p, push ~p)",
                           [SubEndpt, PushEndpt]),
-    StateData1 = StateData#state{body_fun=BodyFun, msg=null, recv=Recv, send=Send},
+    StateData1 = StateData#state{body_fun=BodyFun, req=null, recv=Recv, send=Send},
     {reply, ok, recv, StateData1, 0}.
 
 %% ===================================================================
@@ -138,17 +140,3 @@ init_zmq(SubEndpt, PushEndpt) ->
     {ok, Send} = erlzmq:socket(Context, pub),
     ok = erlzmq:connect(Send, SubEndpt),
     {Recv, Send}.
-
--spec deconstruct (binary()) -> tuple(Uuid::string(), Id::string(), Path::string(),
-                                      Headers::string(), Body::string()).
-%% @doc Incoming ZeroMQ requests are of the following form:
-%%     <<"UUID CLIENT_ID PATH HDRS_SIZE:HDRS,BODY_SIZE:BODY,">>
-%% Here we deconstruct them into a tuple:
-%%     `{Uuid, Id, Path, HeadersSize, Headers, BodySize, Body}'
-deconstruct(ZmqMsg) ->
-    MsgRe = "^([-0-9A-Za-z]+) (\\d+) (.+) (\\d+):(.*),(\\d+):(.*),$",
-    MsgStr = unicode:characters_to_list(ZmqMsg),
-    {match, Captured} = re:run(ZmqMsg, MsgRe),
-    [_|Parts] = [ string:substr(MsgStr, Start+1, Length) || {Start, Length} <- Captured ],
-    list_to_tuple(Parts).
-    
