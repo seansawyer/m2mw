@@ -1,3 +1,6 @@
+
+-compile([{parse_transform, metal_transform}]).
+
 -record(req, {uuid         :: binary(),
               id           :: binary(),
               path         :: binary(),

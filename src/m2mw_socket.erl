@@ -83,7 +83,7 @@ reply(timeout, StateData) ->
     ok = gen_tcp:send(MwSock, HttpReq),
     MochiResp = collect_resp(MwSock),
     ZmqResp = m2mw_util:compose_response(Req, MochiResp),
-    error_logger:info_msg("Constructed ZeroMQ response:~n~p~n", [ZmqResp]),
+    metal:debug("Constructed ZeroMQ response:~n~p~n", [ZmqResp]),
     erlzmq:send(ZmqSend, ZmqResp),
     {next_state, idle, reset(StateData)}. 
 
@@ -109,12 +109,12 @@ collect_resp(MwSock, Lines) ->
             ok = gen_tcp:close(MwSock),
             Lines;
         {error, timeout} ->
-            error_logger:error_msg("Timed out waiting on response from Mochiweb"),
+            metal:error("Timed out waiting on response from Mochiweb"),
             ok = gen_tcp:close(MwSock),
             Lines;
         Other ->
             % really should handle an invalid request here
-            error_logger:error_msg("Unexpected value recv'd for response line:~n~p~n", [Other]),
+            metal:error("Unexpected value recv'd for response line:~n~p~n", [Other]),
             ok = gen_tcp:close(MwSock),
             Lines
     end.
@@ -138,12 +138,12 @@ collect_resp_headers(MwSock, Lines, ContentLength) ->
             ok = gen_tcp:close(MwSock),
             Lines;
         {error, timeout} ->
-            error_logger:error_msg("Timed out waiting on headers from Mochiweb"),
+            metal:error("Timed out waiting on headers from Mochiweb"),
             ok = gen_tcp:close(MwSock),
             Lines;
         Other ->
             % really should handle an invalid request here
-            error_logger:error_msg("Unexpected value recv'd for header:~n~p~n", [Other]),
+            metal:error("Unexpected value recv'd for header:~n~p~n", [Other]),
             ok = gen_tcp:close(MwSock),
             Lines
     end.
@@ -152,7 +152,7 @@ collect_resp_body(MwSock, Lines, ContentLength) ->
     collect_resp_body(MwSock, ["\r\n"|Lines], ContentLength, 0).
 
 collect_resp_body(MwSock, Lines, undefined, _) ->
-    error_logger:info_msg("No content length was specified; sending empty response."),
+    metal:debug("No content length was specified; sending empty response."),
     ok = gen_tcp:close(MwSock),
     Lines;
 collect_resp_body(MwSock, Lines, ContentLength, Read) when Read >= ContentLength ->
@@ -169,7 +169,7 @@ collect_resp_body(MwSock, Lines, ContentLength, NRead) ->
             Lines;
         Other ->
             % really should handle an invalid request here
-            error_logger:error_msg("Unexpected value recv'd for body:~n~p~n", [Other]),
+            metal:error("Unexpected value recv'd for body:~n~p~n", [Other]),
             Lines
     end,
     ok = gen_tcp:close(MwSock),

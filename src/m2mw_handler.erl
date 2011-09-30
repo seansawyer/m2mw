@@ -77,10 +77,9 @@ terminate(_Reason, _State, _StateData) ->
 
 recv(timeout, StateData) ->
     StateData1 = StateData#state{req=null},
-    error_logger:info_msg("Polling Mongrel2 on 0MQ socket: ~p",
-                          [StateData1#state.recv]),
+    metal:debug("Polling Mongrel2 on 0MQ socket: ~p", [StateData1#state.recv]),
     {ok, Msg} = erlzmq:recv(StateData1#state.recv),
-    error_logger:info_msg("Incoming ZeroMQ message:~n~p", [Msg]),
+    metal:debug("Incoming ZeroMQ message:~n~p", [Msg]),
     {next_state, prox, StateData1#state{req=m2mw_util:parse_request(Msg)}, 0}.
 
 recv({configure, _, _, _}, _, StateData) ->
@@ -105,7 +104,7 @@ prox({configure, _, _, _}, _, StateData) ->
     {reply, already_configured, prox, StateData}.
     
 idle(recv, StateData) when StateData#state.recv =:= null ->
-    error_logger:warn_msg("Unable to receive; 0MQ sockets not configured!"),
+    metal:warning("Unable to receive; 0MQ sockets not configured!"),
     {next_state, idle, StateData#state{req=null}};
 idle(recv, StateData) ->
     {next_state, recv, StateData#state{req=null}, 0};
@@ -114,8 +113,8 @@ idle(timeout, StateData) ->
 
 idle({configure, SubEndpt, PushEndpt, BodyFun}, _From, StateData) ->
     {Recv, Send} = init_zmq(SubEndpt, PushEndpt),
-    error_logger:info_msg("Handler sockets configured (sub ~p, push ~p)",
-                          [SubEndpt, PushEndpt]),
+    metal:debug("Handler sockets configured (sub ~p, push ~p)",
+                [SubEndpt, PushEndpt]),
     StateData1 = StateData#state{body_fun=BodyFun, req=null, recv=Recv, send=Send},
     {reply, ok, recv, StateData1, 0}.
 
@@ -130,7 +129,7 @@ init(Port, {ok, SubEndpt}, {ok, PushEndpt}, {ok, BodyFun}) when is_list(SubEndpt
     StateData = #state{body_fun=BodyFun, port=Port, recv=Recv, send=Send},
     {ok, recv, StateData, 0};
 init(Port, _, _, _) ->
-    error_logger:info_msg("Failed to configure from environment; use m2mw_handler:configure/3~n"),
+    metal:error("Failed to configure from environment; use m2mw_handler:configure/3"),
     {ok, idle, #state{port=Port}}.
 
 init_zmq(SubEndpt, PushEndpt) ->
