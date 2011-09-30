@@ -3,4 +3,6 @@ config.sqlite
 deps
 ebin/*.beam
 erl_crash.dump
+log
 rebar
+run
