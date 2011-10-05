@@ -129,7 +129,7 @@ init(Port, {ok, SubEndpt}, {ok, PushEndpt}, {ok, BodyFun}) when is_list(SubEndpt
     StateData = #state{body_fun=BodyFun, port=Port, recv=Recv, send=Send},
     {ok, recv, StateData, 0};
 init(Port, _, _, _) ->
-    metal:error("Failed to configure from environment; use m2mw_handler:configure/3"),
+    metal:info("Failed to configure from environment; use m2mw_handler:configure/3"),
     {ok, idle, #state{port=Port}}.
 
 init_zmq(SubEndpt, PushEndpt) ->
