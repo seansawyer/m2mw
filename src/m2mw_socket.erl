@@ -175,11 +175,12 @@ collect_resp_body(MwSock, Lines, ContentLength, NRead) ->
     ok = gen_tcp:close(MwSock),
     Lines1.
 
-construct_http_req(#req{path=Path, headers=Headers, body=Body}) ->
+construct_http_req(#req{headers=Headers, body=Body}) ->
     {struct, HeadersPl} = mochijson2:decode(Headers),
     Method = proplists:get_value(<<"METHOD">>, HeadersPl),
+    Uri = proplists:get_value(<<"URI">>, HeadersPl),
     Vsn = proplists:get_value(<<"VERSION">>, HeadersPl),
-    RequestLine = io_lib:format("~s ~s ~s\r\n", [Method, Path, Vsn]),
+    RequestLine = io_lib:format("~s ~s ~s\r\n", [Method, Uri, Vsn]),
     HeaderLines = [io_lib:format("~s: ~s\r\n", [K,V]) || {K,V} <- HeadersPl],
     iolist_to_binary([RequestLine, HeaderLines, "\r\n", Body]).
  
