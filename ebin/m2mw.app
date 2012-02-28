@@ -1,6 +1,6 @@
 {application,m2mw,
              [{description,[]},
-              {vsn,"1"},
+              {vsn,"3.1"},
               {registered,[m2mw_sup]},
               {applications,[kernel,stdlib]},
               {mod,{m2mw_app,[]}},
