@@ -51,7 +51,7 @@ init(PortLo, PortHi) when is_integer(PortLo),
                           is_integer(PortHi),
                           PortLo =< PortHi ->
     (PortHi < PortLo) andalso erlang:error(badarg),
-    {ok, {{one_for_all, 5, 10}, child_specs(PortLo, PortHi)}}.
+    {ok, {{one_for_one, 5, 10}, child_specs(PortLo, PortHi)}}.
 
 -spec child(m2mw_handler|m2mw_socket, pos_integer()) -> pid() | nil.
 child(Mod, Port) ->
