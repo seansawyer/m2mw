@@ -4,6 +4,8 @@
          compose_netstrings/1,
          compose_response/2,
          compose_response/3,
+         crash_handler/2,
+         crash_handlers/1,
          parse_netstrings/1,
          parse_request/1,
          test_mochiweb/0,
@@ -46,6 +48,24 @@ compose_response(Uuid, Id, RespBin) ->
     Metadata = io_lib:format("~s ~w:~s, ", [Uuid, size(Id), Id]),
     iolist_to_binary([Metadata, RespBin]).
 
+-spec crash_handlers (term()) -> none().
+crash_handlers(Reason) ->
+    PairSups = supervisor:which_children(m2mw_sup),
+    F = fun({_,Pid,_,_}) ->
+                m2mw_handler:crash(m2mw_pair_sup:handler(Pid), Reason)
+        end,
+    lists:foreach(F, PairSups).
+
+-spec crash_handler (pos_integer(), term()) -> none().
+crash_handler(Port, Reason) ->
+    PairSups = supervisor:which_children(m2mw_sup),
+    F = fun({_Port,Pid,_,_}) when _Port =:= Port ->
+                m2mw_handler:crash(m2mw_pair_sup:handler(Pid), Reason);
+           (_) ->
+                ok
+        end,
+    lists:foreach(F, PairSups).
+
 -spec parse_netstrings (binary())
                        -> list(tuple(NBytes::pos_integer(), Bytes::binary())).
 %% @doc Parse a binary containing one or more netstrings into a list of 2-tuples
@@ -77,6 +97,7 @@ test_mochiweb() ->
     test_mochiweb("127.0.0.1", 8080, Loop, Sub, Push).
 
 test_mochiweb(Ip, Port, Loop, Sub, Push) ->
+    application:set_env(metal, log_backend, metal_error_logger),
     mochiweb_http:start([{ip, Ip}, {port, Port}, {loop, Loop}]),
     application:start(m2mw),
     m2mw_sup:configure_handlers(Sub, Push, Loop).

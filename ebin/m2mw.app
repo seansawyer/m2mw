@@ -1,9 +1,9 @@
 {application,m2mw,
              [{description,[]},
-              {vsn,"3.1"},
+              {vsn,"3.1.1"},
               {registered,[m2mw_sup]},
               {applications,[kernel,stdlib]},
               {mod,{m2mw_app,[]}},
               {env,[{port_lo,9200},{port_hi,9215}]},
-              {modules,[m2mw,m2mw_app,m2mw_handler,m2mw_socket,m2mw_sup,
-                        m2mw_util]}]}.
+              {modules,[m2mw,m2mw_app,m2mw_handler,m2mw_http,m2mw_pair_sup,
+                        m2mw_socket,m2mw_sup,m2mw_util]}]}.

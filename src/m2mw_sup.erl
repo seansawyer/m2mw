@@ -3,78 +3,63 @@
 -behaviour(supervisor).
 
 %% API
--export([configure_handlers/3, handler/1, socket/1, start_link/0, stop/0]).
+-export([configure_handlers/3,
+         start_link/0,
+         stop/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+-define(CHILD(Mod, Port, Type),
+        {{Mod, Port}, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions
 %% ===================================================================
 
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    {ok, Context} = erlzmq:context(),
+    supervisor:start_link({local, ?MODULE}, ?MODULE, [Context]).
 
 stop() ->
     exit(whereis(?MODULE), shutdown).
 
 configure_handlers(Sub, Push, BodyFun) ->
-    Kids = supervisor:which_children(m2mw_sup),
-    Handlers = [Pid || {_,Pid,_,[Mod]} <- Kids, Mod =:= m2mw_handler],
-    lists:foreach(fun(HPid) ->
-                      ok = m2mw_handler:configure(HPid, Sub, Push, BodyFun)
-                  end, Handlers).
-
-handler(Port) ->
-    child(m2mw_handler, Port).
-
-socket(Port) -> 
-    child(m2mw_socket, Port).
+    PairSups = supervisor:which_children(?MODULE),
+    F = fun({_,Pid,_,_}) ->
+                m2mw_pair_sup:configure_handler(Pid, Sub, Push, BodyFun)
+        end,
+    lists:foreach(F, PairSups).
 
 %% ===================================================================
 %% Supervisor callbacks
 %% ===================================================================
 
-init([]) ->
-    {ok, PortLo} = application:get_env(port_lo),
-    {ok, PortHi} = application:get_env(port_hi),
-    init(PortLo, PortHi).
+init([Context]) ->
+    init(Context, application:get_env(port_lo), application:get_env(port_hi)).
 
 %% ===================================================================
 %% Support functions
 %% ===================================================================
 
-init(PortLo, PortHi) when is_integer(PortLo),
-                          is_integer(PortHi),
-                          PortLo =< PortHi ->
-    (PortHi < PortLo) andalso erlang:error(badarg),
-    {ok, {{one_for_all, 5, 10}, child_specs(PortLo, PortHi)}}.
+init(Context, {ok, PortLo}, {ok, PortHi})
+  when is_integer(PortLo),
+       is_integer(PortHi),
+       PortLo =< PortHi ->
+    {ok, {{one_for_one, 5, 10}, child_specs(Context, PortLo, PortHi)}};
+init(Context, _, _) ->
+    erlzmq:term(Context, 1000),
+    {error, invalid_port_range}.
 
--spec child(m2mw_handler|m2mw_socket, pos_integer()) -> pid() | nil.
-child(Mod, Port) ->
-    case lists:keyfind({Mod, Port}, 1, supervisor:which_children(m2mw_sup)) of
-        {{Mod, Port}, Pid, _, _} ->
-            Pid;
-        _ ->
-            nil 
-    end.
+child_specs(Context, StartPort, EndPort) ->
+    child_specs(Context, StartPort, EndPort, []).
 
-child_specs(StartPort, EndPort) ->
-    child_specs(StartPort, EndPort, []).
-
-child_specs(StartPort, EndPort, Children) when StartPort > EndPort ->
+child_specs(_, StartPort, EndPort, Children) when StartPort > EndPort ->
     Children;
-child_specs(StartPort, EndPort, Children) ->
-    [child_spec(m2mw_handler, StartPort),
-     child_spec(m2mw_socket, StartPort) |
-     child_specs(StartPort+1, EndPort, Children)].
+child_specs(Context, StartPort, EndPort, Children) ->
+    [child_spec(m2mw_pair_sup, Context, StartPort)|
+     child_specs(Context, StartPort+1, EndPort, Children)].
 
-child_spec(m2mw_handler, Port) ->
-    {{m2mw_handler, Port}, {m2mw_handler, start_link, [Port]},
-        permanent, 1000, worker, [m2mw_handler]};
-child_spec(m2mw_socket, Port) ->
-    {{m2mw_socket, Port}, {m2mw_socket, start_link, [Port]},
-        permanent, 1000, worker, [m2mw_socket]}.
+child_spec(m2mw_pair_sup, Context, Port) ->
+    {Port, {m2mw_pair_sup, start_link, [Context, Port]},
+     permanent, 1000, supervisor, [m2mw_pair_sup]}.
