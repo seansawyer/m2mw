@@ -6,12 +6,18 @@
          compose_response/3,
          crash_handler/2,
          crash_handlers/1,
+         is_disconnect/1,
          parse_netstrings/1,
          parse_request/1,
          test_mochiweb/0,
          test_mochiweb/5]).
 
 -include_lib("m2mw.hrl").
+
+-define(DC_BODY,
+        <<"{\"type\":\"disconnect\"}">>).
+-define(DC_HEADERS,
+        <<"{\"METHOD\":\"JSON\"}">>).
 
 %% ===================================================================
 %% API
@@ -89,6 +95,12 @@ parse_request(ZmqMsg) ->
     #req{uuid=Uuid, id=Id, path=Path,
          headers_size=HdrsSz, headers=Hdrs,
          body_size=BodySz, body=Body}.
+    
+-spec is_disconnect (#req{}) -> boolean().
+is_disconnect(#req{headers=?DC_HEADERS, body=?DC_BODY}) ->
+    true;
+is_disconnect(_) ->
+    false.
 
 test_mochiweb() ->
     Loop = {mochiweb_http, default_body},

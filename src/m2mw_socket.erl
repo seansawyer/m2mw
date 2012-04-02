@@ -89,13 +89,17 @@ accept(timeout, StateData) ->
     {next_state, reply, StateData#state{mw_sock=MwSock}, 0}.
 
 reply(timeout, StateData) ->
-    #state{mw_sock=MwSock, port=Port, req=Req, zmq_send=ZmqSend} = StateData,
+    #state{mw_sock=MwSock,
+           port=Port,
+           req=Req,
+           sup_pid=SupPid,
+           zmq_send=ZmqSend} = StateData,
     HttpReq = m2mw_http:construct_req(Req),
     ok = gen_tcp:send(MwSock, HttpReq),
     MwResp = m2mw_http:collect_resp(MwSock),
     ZmqResp = m2mw_util:compose_response(Req, MwResp),
     metal:debug("Socket ~p sending ZeroMQ response:~n~p~n", [Port, ZmqResp]),
     erlzmq:send(ZmqSend, ZmqResp),
-    % ok = gen_tcp:close(StateData#state.mw_sock),
+    ok = m2mw_handler:recv(m2mw_pair_sup:handler(SupPid)),
     StateData1 = StateData#state{mw_sock=null, req=null, zmq_send=null},
     {next_state, idle, StateData1}.
