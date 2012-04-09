@@ -1,6 +1,6 @@
 {application,m2mw,
-             [{description,[]},
-              {vsn,"3.1.1"},
+             [{description,"Mongrel2 handler for Mochiweb applications"},
+              {vsn,"3.1.3"},
               {registered,[m2mw_sup]},
               {applications,[kernel,stdlib]},
               {mod,{m2mw_app,[]}},
